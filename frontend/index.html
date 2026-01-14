@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rover Controller</title>
+  <link rel="stylesheet" href="style.css" />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    crossorigin="anonymous"
+  />
+</head>
+<body>
+
+  <!-- MJPG Stream Viewer -->
+  <div class="stream-container">
+    <label for="stream" class="stream-label">Live Camera</label>
+    <img id="stream" src="" alt="Live Stream" />
+  </div>
+
+
+  <div class="control-grid">
+    <!-- Row 1 -->
+    <div class="empty"></div>
+    <button class="btn" id="forward" data-type="direction" data-value="forward" title="Forward">
+      <i class="fas fa-arrow-up"></i>
+    </button>
+    <div class="empty"></div>
+
+    <!-- Row 2 -->
+    <button class="btn" id="left" data-type="turning" data-value="left" title="Turn Left">
+      <i class="fas fa-arrow-left"></i>
+    </button>
+    <button class="btn" id="center" title="Center">
+      <i class="fas fa-circle"></i>
+    </button>
+    <button class="btn" id="right" data-type="turning" data-value="right" title="Turn Right">
+      <i class="fas fa-arrow-right"></i>
+    </button>
+
+    <!-- Row 3 -->
+    <div class="empty"></div>
+    <button class="btn" id="backward" data-type="direction" data-value="backward" title="Backward">
+      <i class="fas fa-arrow-down"></i>
+    </button>
+    <div class="empty"></div>
+  </div>
+
+  <!-- Input Controls -->
+   
+  <div class="input-controls">
+    <label for="rover-url">Rover URL:</label>
+    <input type="text" id="rover-url" placeholder="http://your-rover.local/api" />
+    <label for="speed">Speed (%):</label>
+    <input type="number" id="speed" min="0" max="100" value="35" />
+    <label for="stream-url">Stream URL:</label>
+    <input type="text" id="stream-url" placeholder="http://your-rover.local:8080" />
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
