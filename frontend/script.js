@@ -1,12 +1,131 @@
-const streamUrlInput = document.getElementById("stream-url");
 const streamElement = document.getElementById("stream");
+const connectionStatus = document.getElementById("connection-status");
 
-function updateStreamUrl() {
-  const streamBase = streamUrlInput.value.trim();
-  if (!streamBase) return;
+let peerConnection = null;
+let reconnectTimeout = null;
+let isConnecting = false;
 
-  // Append typical mjpg-streamer endpoint
-  streamElement.src = streamBase.replace(/\/+$/, "") + "/?action=stream";
+function updateConnectionStatus(status) {
+  connectionStatus.textContent = status === "connected" ? "●" : "○";
+  connectionStatus.className = `status-indicator ${status}`;
+}
+
+async function connectWebRTC() {
+  if (isConnecting) return;
+  
+  const baseUrl = getRoverURL();
+  if (!baseUrl) {
+    console.warn("No Rover URL set");
+    updateConnectionStatus("disconnected");
+    return;
+  }
+
+  isConnecting = true;
+  updateConnectionStatus("connecting");
+
+  try {
+    // Close existing connection if any
+    if (peerConnection) {
+      peerConnection.close();
+    }
+
+    // Create new peer connection
+    peerConnection = new RTCPeerConnection({
+      iceServers: [] // No STUN/TURN for local network
+    });
+
+    // Add transceiver to receive video - required for aiortc
+    peerConnection.addTransceiver('video', { direction: 'recvonly' });
+
+    // Handle incoming stream
+    peerConnection.ontrack = (event) => {
+      console.log("Received track");
+      streamElement.srcObject = event.streams[0];
+      updateConnectionStatus("connected");
+      isConnecting = false;
+    };
+
+    // Handle connection state changes
+    peerConnection.onconnectionstatechange = () => {
+      console.log("Connection state:", peerConnection.connectionState);
+      if (peerConnection.connectionState === "failed" || 
+          peerConnection.connectionState === "disconnected" ||
+          peerConnection.connectionState === "closed") {
+        updateConnectionStatus("disconnected");
+        isConnecting = false;
+        // Attempt reconnection after 2 seconds
+        if (reconnectTimeout) clearTimeout(reconnectTimeout);
+        reconnectTimeout = setTimeout(() => {
+          if (peerConnection.connectionState !== "connected") {
+            connectWebRTC();
+          }
+        }, 2000);
+      } else if (peerConnection.connectionState === "connected") {
+        updateConnectionStatus("connected");
+        isConnecting = false;
+      }
+    };
+
+    // Handle ICE candidates (not needed for local network, but good practice)
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log("ICE candidate:", event.candidate);
+      }
+    };
+
+    // Create offer
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+
+    // Send offer to server
+    const offerUrl = baseUrl.replace(/\/+$/, "") + "/offer";
+    const response = await fetch(offerUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sdp: offer.sdp,
+        type: offer.type,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const answer = await response.json();
+    await peerConnection.setRemoteDescription(
+      new RTCSessionDescription(answer)
+    );
+
+  } catch (error) {
+    console.error("WebRTC connection error:", error);
+    updateConnectionStatus("disconnected");
+    isConnecting = false;
+    // Attempt reconnection after 3 seconds
+    if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    reconnectTimeout = setTimeout(() => {
+      connectWebRTC();
+    }, 3000);
+  }
+}
+
+function disconnectWebRTC() {
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
+  if (streamElement.srcObject) {
+    streamElement.srcObject.getTracks().forEach(track => track.stop());
+    streamElement.srcObject = null;
+  }
+  updateConnectionStatus("disconnected");
+  isConnecting = false;
 }
 
 
@@ -99,12 +218,28 @@ controlButtons.forEach((btn) => {
 
 
 
-// Update stream on input changes
-streamUrlInput.addEventListener("change", updateStreamUrl);
-streamUrlInput.addEventListener("blur", updateStreamUrl);
-streamUrlInput.addEventListener("keyup", (e) => {
-  if (e.key === "Enter") updateStreamUrl();
+// Connect WebRTC when rover URL changes
+roverUrlInput.addEventListener("change", () => {
+  disconnectWebRTC();
+  connectWebRTC();
+});
+roverUrlInput.addEventListener("blur", () => {
+  if (!peerConnection || peerConnection.connectionState !== "connected") {
+    connectWebRTC();
+  }
 });
 
-// Load stream on first page load
-window.addEventListener("DOMContentLoaded", updateStreamUrl);
+// Connect on page load
+window.addEventListener("DOMContentLoaded", () => {
+  // Initialize connection status
+  updateConnectionStatus("disconnected");
+  // Small delay to ensure DOM is ready
+  setTimeout(() => {
+    connectWebRTC();
+  }, 500);
+});
+
+// Cleanup on page unload
+window.addEventListener("beforeunload", () => {
+  disconnectWebRTC();
+});

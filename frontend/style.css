@@ -127,6 +127,43 @@ body {
   max-width: 100%;
 }
 
+.stream-label {
+  color: #ccc;
+  font-size: 16px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator {
+  font-size: 12px;
+  display: inline-block;
+  transition: color 0.3s;
+}
+
+.status-indicator.connected {
+  color: #4ade80;
+}
+
+.status-indicator.connecting {
+  color: #fbbf24;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status-indicator.disconnected {
+  color: #ef4444;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 #stream {
   width: 320px;
   height: 240px;
